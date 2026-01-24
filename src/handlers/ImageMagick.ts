@@ -1,8 +1,9 @@
 import {
   initializeImageMagick,
-  ImageMagick,
   Magick,
   MagickFormat,
+  MagickImageCollection,
+  MagickReadSettings
 } from "@imagemagick/magick-wasm";
 
 import mime from "mime";
@@ -62,21 +63,30 @@ class ImageMagickHandler implements FormatHandler {
     const inputMagickFormat = inputFormat.internal as MagickFormat;
     const outputMagickFormat = outputFormat.internal as MagickFormat;
 
-    const outputFiles: FileData[] = [];
+    const inputSettings = new MagickReadSettings();
+    inputSettings.format = inputMagickFormat;
 
-    for (const inputFile of inputFiles) {
-      const baseName = inputFile.name.split(".")[0];
-      const newName = baseName + "." + outputFormat.extension;
-
-      ImageMagick.read(inputFile.bytes, inputMagickFormat, (image) => {
-        image.write(outputMagickFormat, (bytes) => {
-          outputFiles.push({ bytes: new Uint8Array(bytes), name: newName });
+    const bytes: Uint8Array = await new Promise(resolve => {
+      MagickImageCollection.use(outputCollection => {
+        for (const inputFile of inputFiles) {
+          MagickImageCollection.use(fileCollection => {
+            fileCollection.read(inputFile.bytes);
+            while (fileCollection.length > 0) {
+              const image = fileCollection.shift();
+              if (!image) break;
+              outputCollection.push(image);
+            }
+          });
+        }
+        outputCollection.write(outputMagickFormat, (bytes) => {
+          resolve(new Uint8Array(bytes));
         });
-        image.dispose();
       });
-    }
+    });
 
-    return outputFiles;
+    const baseName = inputFiles[0].name.split(".")[0];
+    const name = baseName + "." + outputFormat.extension;
+    return [{ bytes, name }];
 
   }
 

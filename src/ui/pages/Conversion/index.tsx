@@ -259,7 +259,8 @@ export default function Conversion() {
     try {
       const inputFileData = [];
       for (const f of files) {
-        const bytes = await f.bytes();
+        const buf = await f.arrayBuffer();
+        const bytes = new Uint8Array(buf);
 
         if (
           fromOption[0].mime === toOption[0].mime &&
